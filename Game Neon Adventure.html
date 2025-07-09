@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Adventure</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: black;
+  }
+  canvas {
+    display: block;
+    background: radial-gradient(#050505, #000000);
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<script>
+// Canvas setup
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+window.addEventListener('resize', () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+});
+
+// Game variables
+const gravity = 0.7;
+const keys = { left: false, right: false, up: false };
+let score = 0;
+
+// Sounds
+const jumpSound = new Audio('https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg');
+const collectSound = new Audio('https://actions.google.com/sounds/v1/cartoon/pop.ogg');
+const hitSound = new Audio('https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg');
+const bgMusic = new Audio('https://files.freemusicarchive.org/storage-freemusicarchive-org/music/no_curator/Sawsquarenoise/SQN-Neon/Sawsquarenoise_-_03_-_Neon.mp3');
+bgMusic.loop = true;
+bgMusic.volume = 0.4;
+bgMusic.play();
+
+// Player
+const player = {
+  x: 100,
+  y: 100,
+  width: 40,
+  height: 40,
+  color: '#0ff',
+  dx: 0,
+  dy: 0,
+  speed: 5,
+  jumpPower: -15,
+  onGround: false,
+  doubleJump: true
+};
+
+// Platforms
+const platforms = [
+  {x: 0, y: canvas.height - 40, width: canvas.width, height: 40},
+  {x: 200, y: canvas.height - 140, width: 200, height: 20},
+  {x: 500, y: canvas.height - 240, width: 200, height: 20},
+  {x: 850, y: canvas.height - 340, width: 200, height: 20},
+  {x: 1200, y: canvas.height - 200, width: 200, height: 20}
+];
+
+// Enemies
+const enemies = [
+  {x: 600, y: canvas.height - 260, width: 30, height: 30, dx: 2},
+  {x: 900, y: canvas.height - 360, width: 30, height: 30, dx: -2}
+];
+
+// Collectibles
+const orbs = [
+  {x: 550, y: canvas.height - 270, collected: false},
+  {x: 1250, y: canvas.height - 220, collected: false}
+];
+
+// Warp portal
+const portal = {x: 1400, y: canvas.height - 260, width: 50, height: 70};
+
+// Stars background
+const stars = Array.from({length: 100}, () => ({
+  x: Math.random() * canvas.width,
+  y: Math.random() * canvas.height,
+  radius: Math.random() * 2,
+  dx: (Math.random() - 0.5) * 0.5
+}));
+
+// Input
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'ArrowLeft') keys.left = true;
+  if (e.code === 'ArrowRight') keys.right = true;
+  if (e.code === 'Space') {
+    if (player.onGround) {
+      player.dy = player.jumpPower;
+      player.onGround = false;
+      player.doubleJump = true;
+      jumpSound.play();
+    } else if (player.doubleJump) {
+      player.dy = player.jumpPower;
+      player.doubleJump = false;
+      jumpSound.play();
+    }
+  }
+});
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'ArrowLeft') keys.left = false;
+  if (e.code === 'ArrowRight') keys.right = false;
+});
+
+// Game Loop
+function gameLoop() {
+  requestAnimationFrame(gameLoop);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw background stars
+  ctx.fillStyle = '#0ff';
+  stars.forEach(s => {
+    s.x += s.dx;
+    if (s.x < 0) s.x = canvas.width;
+    if (s.x > canvas.width) s.x = 0;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Player movement
+  if (keys.left) player.dx = -player.speed;
+  else if (keys.right) player.dx = player.speed;
+  else player.dx = 0;
+
+  player.dy += gravity;
+  player.x += player.dx;
+  player.y += player.dy;
+
+  // Platform collision
+  player.onGround = false;
+  platforms.forEach(p => {
+    // Draw platform
+    ctx.fillStyle = '#0f0';
+    ctx.shadowColor = '#0f0';
+    ctx.shadowBlur = 10;
+    ctx.fillRect(p.x, p.y, p.width, p.height);
+    ctx.shadowBlur = 0;
+
+    // Collision
+    if (player.x < p.x + p.width &&
+        player.x + player.width > p.x &&
+        player.y + player.height < p.y + p.height + 10 &&
+        player.y + player.height + player.dy >= p.y) {
+      player.y = p.y - player.height;
+      player.dy = 0;
+      player.onGround = true;
+    }
+  });
+
+  // Enemy movement and collision
+  enemies.forEach(e => {
+    e.x += e.dx;
+    if (e.x < 500 || e.x > 1100) e.dx *= -1;
+
+    ctx.fillStyle = '#f00';
+    ctx.shadowColor = '#f00';
+    ctx.shadowBlur = 10;
+    ctx.fillRect(e.x, e.y, e.width, e.height);
+    ctx.shadowBlur = 0;
+
+    if (player.x < e.x + e.width &&
+        player.x + player.width > e.x &&
+        player.y < e.y + e.height &&
+        player.y + player.height > e.y) {
+      // Hit enemy
+      hitSound.play();
+      player.x = 100;
+      player.y = 100;
+      player.dx = 0;
+      player.dy = 0;
+    }
+  });
+
+  // Collectibles
+  orbs.forEach(o => {
+    if (!o.collected) {
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, 10, 0, Math.PI * 2);
+      ctx.fillStyle = '#ff0';
+      ctx.shadowColor = '#ff0';
+      ctx.shadowBlur = 20;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      if (player.x < o.x + 10 &&
+          player.x + player.width > o.x - 10 &&
+          player.y < o.y + 10 &&
+          player.y + player.height > o.y - 10) {
+        o.collected = true;
+        score += 10;
+        collectSound.play();
+      }
+    }
+  });
+
+  // Portal
+  ctx.fillStyle = '#0ff';
+  ctx.shadowColor = '#0ff';
+  ctx.shadowBlur = 20;
+  ctx.fillRect(portal.x, portal.y, portal.width, portal.height);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#000';
+  ctx.fillText('EXIT', portal.x + 5, portal.y + 40);
+
+  if (player.x < portal.x + portal.width &&
+      player.x + player.width > portal.x &&
+      player.y < portal.y + portal.height &&
+      player.y + player.height > portal.y) {
+    alert('🎉 You Win! Score: ' + score);
+    window.location.reload();
+  }
+
+  // Draw player
+  ctx.fillStyle = player.color;
+  ctx.shadowColor = player.color;
+  ctx.shadowBlur = 20;
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+  ctx.shadowBlur = 0;
+
+  // UI
+  ctx.fillStyle = '#fff';
+  ctx.font = '20px Courier New';
+  ctx.fillText('Score: ' + score, 20, 30);
+}
+
+gameLoop();
+</script>
+
+</body>
+</html>

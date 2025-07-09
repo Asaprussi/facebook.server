@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Matchmaking Web of LOVE</title>
+<style>
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    margin: 0; padding: 0;
+    background: radial-gradient(circle at center, #ff0080 0%, #330033 100%);
+    color: #fff;
+  }
+  header {
+    text-align: center;
+    padding: 30px 15px;
+    background: rgba(0,0,0,0.3);
+    border-bottom: 2px solid rgba(255,255,255,0.2);
+  }
+  header h1 {
+    font-size: 2.5em;
+    color: #ff66cc;
+    text-shadow: 0 0 10px #ff00cc, 0 0 20px #ff00cc;
+  }
+  header p {
+    margin-top: 10px;
+    font-style: italic;
+    font-size: 0.95em;
+    color: #ffd6f6;
+  }
+  #container {
+    display: flex;
+    height: calc(100vh - 180px);
+  }
+  #users {
+    width: 300px;
+    background-color: rgba(255,255,255,0.1);
+    padding: 15px;
+    overflow-y: auto;
+    border-right: 2px solid rgba(255,255,255,0.15);
+  }
+  #chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 15px;
+  }
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    background: rgba(255,255,255,0.15);
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: inset 0 0 10px rgba(255,255,255,0.2);
+  }
+  .message {
+    margin: 5px 0;
+    padding: 8px 10px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 10px;
+    color: #fff;
+  }
+  #input {
+    display: flex;
+    gap: 10px;
+    margin-top: auto;
+  }
+  #input input {
+    flex: 1;
+    padding: 14px;
+    border-radius: 10px;
+    border: 2px solid #0ff;
+    font-size: 1em;
+    background-color: #fff;
+    color: #000;
+    box-shadow: 0 0 8px #0ff;
+  }
+  #input button {
+    padding: 14px 20px;
+    border: none;
+    background-color: #00ffff;
+    color: #000;
+    font-weight: bold;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 1em;
+    box-shadow: 0 0 10px #00ffff;
+    transition: background 0.3s;
+  }
+  .user {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 8px;
+    margin: 6px 0;
+  }
+  .blockBtn, .unblockBtn {
+    background: red;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 0.8em;
+    cursor: pointer;
+  }
+  .unblockBtn {
+    background: green;
+  }
+  #matchButton, #unblockAllButton {
+    margin-top: 15px;
+    padding: 12px;
+    width: 100%;
+    background: #00ffcc;
+    color: black;
+    font-weight: bold;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: 0 0 10px #00ffff;
+  }
+  #matchDisplay {
+    text-align: center;
+    margin-top: 10px;
+    color: #00ffcc;
+    font-weight: bold;
+    font-size: 1.1em;
+    text-shadow: 0 0 5px #000;
+  }
+  #blockedOverlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.95);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 2em;
+    z-index: 9999;
+  }
+  #blockedListContainer {
+    margin-top: 15px;
+    background: rgba(0,0,0,0.3);
+    padding: 10px;
+    border-radius: 10px;
+    max-height: 150px;
+    overflow-y: auto;
+    color: #ff8080;
+  }
+  #blockedListContainer h3 {
+    margin-top: 0;
+    text-align: center;
+    color: #ff3399;
+    text-shadow: 0 0 5px #ff00cc;
+  }
+  #blockedListContainer ul {
+    padding-left: 20px;
+    margin: 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>💖 The Matchmaking Web of LOVE 💖</h1>
+  <p>Created by Russell Shaun Edwards on Wednesday 9th July, 2025.</p>
+</header>
+
+<div id="container">
+  <div id="users">
+    <strong>Online Users:</strong>
+    <div id="userList"></div>
+    <button id="matchButton" onclick="foundLove()">💞 I Found My Match!</button>
+    <div id="matchDisplay"></div>
+    <button id="unblockAllButton" style="display:none;" onclick="unblockAll()">🔓 Unblock All Users</button>
+    <div id="blockedListContainer" style="display:none;">
+      <h3>🚫 Blocked Users</h3>
+      <ul id="blockedUsersList"></ul>
+    </div>
+  </div>
+
+  <div id="chat">
+    <div id="messages"></div>
+    <div id="input">
+      <input type="text" id="messageInput" placeholder="Type your message..." onkeydown="handleEnter(event)" />
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+</div>
+
+<div id="blockedOverlay" style="display:none;">🚫 You are blocked from this chat.</div>
+
+<audio id="trashSound" src="https://actions.google.com/sounds/v1/cartoon/trash_can.ogg" preload="auto"></audio>
+<audio id="unblockSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
+
+<script>
+  // === Variables & Elements ===
+  let userName = "";
+  do {
+    userName = prompt("Enter your name:")?.trim() || "";
+  } while (!userName); // force input
+
+  const isCreator = userName === "Russell Shaun Edwards";
+  const messages = document.getElementById("messages");
+  const userList = document.getElementById("userList");
+  const matchDisplay = document.getElementById("matchDisplay");
+  const unblockAllButton = document.getElementById("unblockAllButton");
+  const blockedOverlay = document.getElementById("blockedOverlay");
+  const blockedListContainer = document.getElementById("blockedListContainer");
+  const blockedUsersList = document.getElementById("blockedUsersList");
+  const trashSound = document.getElementById("trashSound");
+  const unblockSound = document.getElementById("unblockSound");
+
+  let users = {};
+  let blockedUsers = JSON.parse(localStorage.getItem("blockedUsers") || "[]");
+
+  // Show controls only to creator
+  if (isCreator) {
+    unblockAllButton.style.display = "block";
+    blockedListContainer.style.display = "block";
+  }
+
+  // Check if current user is blocked
+  if (blockedUsers.includes(userName)) {
+    blockedOverlay.style.display = "flex";
+  }
+
+  // === Functions ===
+  function addMessage(msg) {
+    const div = document.createElement("div");
+    div.className = "message";
+    div.textContent = msg;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function sendMessage() {
+    if (blockedUsers.includes(userName)) return;
+    const input = document.getElementById("messageInput");
+    const msg = input.value.trim();
+    if (!msg) return;
+    addMessage(`${userName}: ${msg}`);
+    input.value = "";
+  }
+
+  function handleEnter(e) {
+    if (e.key === "Enter") sendMessage();
+  }
+
+  function updateUserList() {
+    userList.innerHTML = "";
+    for (const user in users) {
+      if (user === userName) continue; // no self in list
+      const div = document.createElement("div");
+      div.className = "user";
+
+      const blockedLabel = blockedUsers.includes(user) ? " (blocked)" : "";
+
+      let btnHTML = "";
+      if (isCreator) {
+        if (blockedUsers.includes(user)) {
+          btnHTML = `<button class="unblockBtn" onclick="unblockUser('${user}')">Unblock</button>`;
+        } else {
+          btnHTML = `<button class="blockBtn" onclick="blockUser('${user}')">Block</button>`;
+        }
+      }
+
+      div.innerHTML = `<span>${user}${blockedLabel}</span> ${btnHTML}`;
+      userList.appendChild(div);
+    }
+    updateBlockedUsersList();
+  }
+
+  function updateBlockedUsersList() {
+    blockedUsersList.innerHTML = "";
+    if (blockedUsers.length === 0) {
+      blockedUsersList.innerHTML = "<li>No users blocked.</li>";
+      return;
+    }
+    blockedUsers.forEach(u => {
+      const li = document.createElement("li");
+      li.textContent = u;
+      blockedUsersList.appendChild(li);
+    });
+  }
+
+  function blockUser(userToBlock) {
+    if (!isCreator) return;
+    if (blockedUsers.includes(userToBlock)) {
+      alert(userToBlock + " is already blocked.");
+      return;
+    }
+    blockedUsers.push(userToBlock);
+    localStorage.setItem("blockedUsers", JSON.stringify(blockedUsers));
+    trashSound.play();
+    alert(userToBlock + " has been blocked.");
+
+    // If blocking the current user (shouldn't happen but just in case)
+    if (userToBlock === userName) {
+      blockedOverlay.style.display = "flex";
+    }
+    updateUserList();
+  }
+
+  function unblockUser(userToUnblock) {
+    if (!isCreator) return;
+    const index = blockedUsers.indexOf(userToUnblock);
+    if (index === -1) {
+      alert(userToUnblock + " is not blocked.");
+      return;
+    }
+    blockedUsers.splice(index, 1);
+    localStorage.setItem("blockedUsers", JSON.stringify(blockedUsers));
+    unblockSound.play();
+    alert(userToUnblock + " has been unblocked.");
+
+    // If unblocking self (again, unlikely but safe)
+    if (userToUnblock === userName) {
+      blockedOverlay.style.display = "none";
+    }
+    updateUserList();
+  }
+
+  function unblockAll() {
+    if (!isCreator) return;
+    if (!blockedUsers.length) {
+      alert("No users to unblock.");
+      return;
+    }
+    blockedUsers = [];
+    localStorage.removeItem("blockedUsers");
+    unblockSound.play();
+    alert("All users unblocked.");
+    blockedOverlay.style.display = "none";
+    updateUserList();
+  }
+
+  function foundLove() {
+    matchDisplay.innerHTML = `💖 ${userName} has found true love in the Web of LOVE! 💖`;
+    addMessage(`🌟 ANNOUNCEMENT: ${userName} has found their match! 🎉`);
+  }
+
+  // === Simulate users & initial UI update ===
+  setTimeout(() => {
+    users = {
+      "Luna 💫": true,
+      "Kai 🔥": true,
+      [userName]: true
+    };
+    updateUserList();
+
+    if (!blockedUsers.includes(userName)) {
+      addMessage(`🌟 Welcome to the Matchmaking Web of LOVE, ${userName}!`);
+    }
+  }, 500);
+</script>
+
+</body>
+</html>

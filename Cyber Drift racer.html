@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cyber Drift Racer</title>
+<style>
+  * {margin:0; padding:0; box-sizing:border-box;}
+  body {background:#000; overflow:hidden; font-family:'Courier New',monospace;}
+  canvas {display:block;}
+  #ui {
+    position:absolute; top:10px; left:50%; transform:translateX(-50%);
+    color:#0ff; text-align:center; font-size:18px;
+  }
+  #startScreen, #gameOverScreen {
+    position:absolute; width:100%; height:100%; background:#000a;
+    display:flex; justify-content:center; align-items:center;
+    flex-direction:column; color:#0ff; font-size:24px;
+    z-index:5;
+  }
+  button {
+    margin:10px; padding:10px 20px;
+    background:#0ff; color:#000; border:none;
+    cursor:pointer; font-weight:bold;
+    border-radius:10px;
+  }
+</style>
+</head>
+<body>
+<div id="ui">
+  <div id="developer">Developed by Russell Shaun Edwards on Thursday, 26th June, 2025</div>
+  <div>Lives: <span id="lives">3</span> | Score: <span id="score">0</span></div>
+</div>
+
+<div id="startScreen">
+  <div>Cyber Drift Racer</div>
+  <button onclick="startGame()">Play</button>
+</div>
+
+<div id="gameOverScreen" style="display:none;">
+  <div>Game Over</div>
+  <div>Score: <span id="finalScore"></span></div>
+  <button onclick="startGame()">Retry</button>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<audio id="bgMusic" src="https://files.freemusicarchive.org/storage-freemusicarchive-org/music/no_curator/Streambeats_by_Harris_Heller/Stratosphere/StreamBeats_by_Harris_Heller_-_08_-_Neon_Lights.mp3" loop></audio>
+<audio id="crashSound" src="https://www.soundjay.com/buttons/sounds/button-10.mp3"></audio>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let width = window.innerWidth;
+let height = window.innerHeight;
+canvas.width = width;
+canvas.height = height;
+
+window.addEventListener('resize', () => {
+  width = window.innerWidth;
+  height = window.innerHeight;
+  canvas.width = width;
+  canvas.height = height;
+  initStars();
+});
+
+// ✨ Starfield: now only 30 stars for performance
+let stars = [];
+function initStars() {
+  stars = [];
+  for(let i=0;i<30;i++){
+    stars.push({
+      x: Math.random()*width,
+      y: Math.random()*height,
+      size: Math.random()*1.2+0.3,
+      speed: Math.random()*0.5+0.2
+    });
+  }
+}
+initStars();
+
+const lanes = [-width/6, 0, width/6];
+let player = {x:0, y:height-150, lane:1, size:50};
+let obstacles = [];
+let particles = [];
+let orbs = [];
+let lives = 3;
+let score = 0;
+let gameRunning = false;
+let speed = 5;
+
+const bgMusic = document.getElementById('bgMusic');
+const crashSound = document.getElementById('crashSound');
+
+function startGame() {
+  player.lane = 1;
+  player.x = 0;
+  player.y = height-150;
+  obstacles = [];
+  orbs = [];
+  particles = [];
+  lives = 3;
+  score = 0;
+  speed = 5;
+  gameRunning = true;
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('gameOverScreen').style.display = 'none';
+  bgMusic.volume = 0.5;
+  bgMusic.play();
+  gameLoop();
+}
+
+function gameOver() {
+  gameRunning = false;
+  bgMusic.pause();
+  document.getElementById('finalScore').innerText = score;
+  document.getElementById('gameOverScreen').style.display = 'flex';
+}
+
+document.addEventListener('keydown', e => {
+  if(!gameRunning) return;
+  if(e.key === 'ArrowLeft' && player.lane > 0) player.lane--;
+  if(e.key === 'ArrowRight' && player.lane < 2) player.lane++;
+});
+
+function spawnObstacle() {
+  const lane = Math.floor(Math.random()*3);
+  obstacles.push({lane, y:-100, size:60});
+}
+
+function spawnOrb() {
+  const lane = Math.floor(Math.random()*3);
+  orbs.push({lane, y:-100, size:20});
+}
+
+function drawPlayer() {
+  player.x = width/2 + lanes[player.lane];
+  ctx.fillStyle = '#0ff';
+  ctx.fillRect(player.x-25, player.y-25, 50, 50);
+  ctx.fillStyle = 'rgba(0,255,255,0.2)';
+  ctx.fillRect(player.x-15, player.y+25, 30, 50);
+}
+
+function drawObstacle(obs) {
+  const x = width/2 + lanes[obs.lane];
+  ctx.fillStyle = '#f00';
+  ctx.fillRect(x-30, obs.y, obs.size, obs.size);
+}
+
+function drawOrb(orb) {
+  const x = width/2 + lanes[orb.lane];
+  ctx.fillStyle = '#ff0';
+  ctx.beginPath();
+  ctx.arc(x, orb.y, orb.size, 0, Math.PI*2);
+  ctx.fill();
+}
+
+function drawParticles() {
+  particles.forEach(p=>{
+    ctx.fillStyle=`rgba(255,0,0,${p.alpha})`;
+    ctx.fillRect(p.x,p.y,3,3);
+    p.x += p.vx;
+    p.y += p.vy;
+    p.alpha -=0.04;
+  });
+  particles = particles.filter(p=>p.alpha>0);
+}
+
+function drawGalaxyBackground(){
+  ctx.fillStyle='#000';
+  ctx.fillRect(0,0,width,height);
+
+  const gradient = ctx.createRadialGradient(width/2, height/2, 100, width/2, height/2, width/1.5);
+  gradient.addColorStop(0, '#220033');
+  gradient.addColorStop(0.5, '#000011');
+  gradient.addColorStop(1, '#000000');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0,0,width,height);
+
+  stars.forEach(s=>{
+    ctx.fillStyle='white';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.size, 0, Math.PI*2);
+    ctx.fill();
+    s.y += s.speed;
+    if(s.y > height){
+      s.y = 0;
+      s.x = Math.random()*width;
+    }
+  });
+}
+
+function gameLoop() {
+  if(!gameRunning) return;
+  drawGalaxyBackground();
+
+  ctx.strokeStyle='rgba(0,255,255,0.2)';
+  for(let i=0;i<3;i++){
+    let x=width/2+lanes[i];
+    ctx.beginPath();
+    ctx.moveTo(x,0);
+    ctx.lineTo(x,height);
+    ctx.stroke();
+  }
+
+  drawPlayer();
+
+  obstacles.forEach(obs=>{
+    obs.y += speed;
+    drawObstacle(obs);
+    const x = width/2 + lanes[obs.lane];
+    if(Math.abs(player.y - obs.y)<40 && obs.lane === player.lane){
+      lives--;
+      crashSound.play();
+      for(let i=0;i<15;i++){
+        particles.push({
+          x: x,
+          y: obs.y,
+          vx:(Math.random()-0.5)*5,
+          vy:(Math.random()-0.5)*5,
+          alpha:1
+        });
+      }
+      obs.y = height+100;
+      if(lives<=0) gameOver();
+    }
+  });
+
+  orbs.forEach(orb=>{
+    orb.y += speed;
+    drawOrb(orb);
+    if(Math.abs(player.y - orb.y)<40 && orb.lane === player.lane){
+      score+=10;
+      orb.y = height+100;
+    }
+  });
+
+  drawParticles();
+
+  obstacles = obstacles.filter(o=>o.y<height+50);
+  orbs = orbs.filter(o=>o.y<height+50);
+
+  if(Math.random()<0.018) spawnObstacle();
+  if(Math.random()<0.009) spawnOrb();
+
+  speed += 0.001;
+  score++;
+
+  document.getElementById('lives').innerText = lives;
+  document.getElementById('score').innerText = score;
+
+  requestAnimationFrame(gameLoop);
+}
+</script>
+</body>
+</html>
