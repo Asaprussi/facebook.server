@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Matchmaking Web of LOVE</title>
+<title>Local-Only Matchmaking Web of LOVE</title>
 <style>
   body {
     font-family: 'Segoe UI', sans-serif;
@@ -33,7 +33,7 @@
     height: calc(100vh - 180px);
   }
   #users {
-    width: 300px;
+    width: 320px;
     background-color: rgba(255,255,255,0.1);
     padding: 15px;
     overflow-y: auto;
@@ -92,7 +92,6 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    cursor: pointer;
     padding: 8px 10px;
     background: rgba(255,255,255,0.2);
     border-radius: 8px;
@@ -110,7 +109,7 @@
   .unblockBtn {
     background: green;
   }
-  #matchButton, #unblockAllButton {
+  #matchButton {
     margin-top: 15px;
     padding: 12px;
     width: 100%;
@@ -130,37 +129,6 @@
     font-size: 1.1em;
     text-shadow: 0 0 5px #000;
   }
-  #blockedOverlay {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background-color: rgba(0,0,0,0.95);
-    color: white;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 2em;
-    z-index: 9999;
-  }
-  #blockedListContainer {
-    margin-top: 15px;
-    background: rgba(0,0,0,0.3);
-    padding: 10px;
-    border-radius: 10px;
-    max-height: 150px;
-    overflow-y: auto;
-    color: #ff8080;
-  }
-  #blockedListContainer h3 {
-    margin-top: 0;
-    text-align: center;
-    color: #ff3399;
-    text-shadow: 0 0 5px #ff00cc;
-  }
-  #blockedListContainer ul {
-    padding-left: 20px;
-    margin: 0;
-  }
 </style>
 </head>
 <body>
@@ -172,191 +140,146 @@
 
 <div id="container">
   <div id="users">
-    <strong>Online Users:</strong>
+    <strong>Users (Local Only):</strong>
     <div id="userList"></div>
-    <button id="matchButton" onclick="foundLove()">💞 I Found My Match!</button>
+    <button id="matchButton">💞 I Found My Match!</button>
     <div id="matchDisplay"></div>
-    <button id="unblockAllButton" style="display:none;" onclick="unblockAll()">🔓 Unblock All Users</button>
-    <div id="blockedListContainer" style="display:none;">
-      <h3>🚫 Blocked Users</h3>
-      <ul id="blockedUsersList"></ul>
-    </div>
   </div>
 
   <div id="chat">
     <div id="messages"></div>
     <div id="input">
-      <input type="text" id="messageInput" placeholder="Type your message..." onkeydown="handleEnter(event)" />
-      <button onclick="sendMessage()">Send</button>
+      <input type="text" id="messageInput" placeholder="Type your message..." />
+      <button id="sendBtn">Send</button>
     </div>
   </div>
 </div>
 
-<div id="blockedOverlay" style="display:none;">🚫 You are blocked from this chat.</div>
-
-<audio id="trashSound" src="https://actions.google.com/sounds/v1/cartoon/trash_can.ogg" preload="auto"></audio>
-<audio id="unblockSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
-
 <script>
-  // === Variables & Elements ===
-  let userName = "";
-  do {
-    userName = prompt("Enter your name:")?.trim() || "";
-  } while (!userName); // force input
-
+  // Load or ask for username
+  let userName = localStorage.getItem("localChatUserName");
+  while (!userName) {
+    userName = prompt("Enter your name:")?.trim();
+    if (userName) {
+      localStorage.setItem("localChatUserName", userName);
+    }
+  }
   const isCreator = userName === "Russell Shaun Edwards";
-  const messages = document.getElementById("messages");
+
+  // Load or initialize local "users" list
+  let users = JSON.parse(localStorage.getItem("localChatUsers") || "[]");
+  if (!users.includes(userName)) {
+    users.push(userName);
+    localStorage.setItem("localChatUsers", JSON.stringify(users));
+  }
+
+  // Load or initialize messages array
+  let messages = JSON.parse(localStorage.getItem("localChatMessages") || "[]");
+
+  // Load or initialize blocked users list (only effective for current user view)
+  let blockedUsers = JSON.parse(localStorage.getItem("localChatBlockedUsers") || "[]");
+
+  // DOM references
   const userList = document.getElementById("userList");
+  const messagesDiv = document.getElementById("messages");
+  const input = document.getElementById("messageInput");
+  const sendBtn = document.getElementById("sendBtn");
+  const matchBtn = document.getElementById("matchButton");
   const matchDisplay = document.getElementById("matchDisplay");
-  const unblockAllButton = document.getElementById("unblockAllButton");
-  const blockedOverlay = document.getElementById("blockedOverlay");
-  const blockedListContainer = document.getElementById("blockedListContainer");
-  const blockedUsersList = document.getElementById("blockedUsersList");
-  const trashSound = document.getElementById("trashSound");
-  const unblockSound = document.getElementById("unblockSound");
 
-  let users = {};
-  let blockedUsers = JSON.parse(localStorage.getItem("blockedUsers") || "[]");
-
-  // Show controls only to creator
-  if (isCreator) {
-    unblockAllButton.style.display = "block";
-    blockedListContainer.style.display = "block";
-  }
-
-  // Check if current user is blocked
-  if (blockedUsers.includes(userName)) {
-    blockedOverlay.style.display = "flex";
-  }
-
-  // === Functions ===
-  function addMessage(msg) {
-    const div = document.createElement("div");
-    div.className = "message";
-    div.textContent = msg;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
-  }
-
-  function sendMessage() {
-    if (blockedUsers.includes(userName)) return;
-    const input = document.getElementById("messageInput");
-    const msg = input.value.trim();
-    if (!msg) return;
-    addMessage(`${userName}: ${msg}`);
-    input.value = "";
-  }
-
-  function handleEnter(e) {
-    if (e.key === "Enter") sendMessage();
-  }
-
-  function updateUserList() {
+  // Render users list with block/unblock buttons if creator
+  function renderUsers() {
     userList.innerHTML = "";
-    for (const user in users) {
-      if (user === userName) continue; // no self in list
+    users.forEach(u => {
+      // Skip blocked users from display
+      if (blockedUsers.includes(u)) return;
+
       const div = document.createElement("div");
       div.className = "user";
 
-      const blockedLabel = blockedUsers.includes(user) ? " (blocked)" : "";
-
-      let btnHTML = "";
-      if (isCreator) {
-        if (blockedUsers.includes(user)) {
-          btnHTML = `<button class="unblockBtn" onclick="unblockUser('${user}')">Unblock</button>`;
+      let buttonsHTML = "";
+      if (isCreator && u !== userName) {
+        if (blockedUsers.includes(u)) {
+          buttonsHTML = `<button class="unblockBtn" onclick="unblockUser('${u}')">Unblock</button>`;
         } else {
-          btnHTML = `<button class="blockBtn" onclick="blockUser('${user}')">Block</button>`;
+          buttonsHTML = `<button class="blockBtn" onclick="blockUser('${u}')">Block</button>`;
         }
       }
 
-      div.innerHTML = `<span>${user}${blockedLabel}</span> ${btnHTML}`;
+      div.innerHTML = `<span>${u}${u === userName ? " (You)" : ""}</span>${buttonsHTML}`;
       userList.appendChild(div);
-    }
-    updateBlockedUsersList();
-  }
-
-  function updateBlockedUsersList() {
-    blockedUsersList.innerHTML = "";
-    if (blockedUsers.length === 0) {
-      blockedUsersList.innerHTML = "<li>No users blocked.</li>";
-      return;
-    }
-    blockedUsers.forEach(u => {
-      const li = document.createElement("li");
-      li.textContent = u;
-      blockedUsersList.appendChild(li);
     });
   }
 
-  function blockUser(userToBlock) {
-    if (!isCreator) return;
-    if (blockedUsers.includes(userToBlock)) {
-      alert(userToBlock + " is already blocked.");
-      return;
-    }
-    blockedUsers.push(userToBlock);
-    localStorage.setItem("blockedUsers", JSON.stringify(blockedUsers));
-    trashSound.play();
-    alert(userToBlock + " has been blocked.");
-
-    // If blocking the current user (shouldn't happen but just in case)
-    if (userToBlock === userName) {
-      blockedOverlay.style.display = "flex";
-    }
-    updateUserList();
+  // Render messages excluding those from blocked users
+  function renderMessages() {
+    messagesDiv.innerHTML = "";
+    messages.forEach(({ user, text }) => {
+      if (blockedUsers.includes(user)) return;
+      const div = document.createElement("div");
+      div.className = "message";
+      div.textContent = `${user}: ${text}`;
+      messagesDiv.appendChild(div);
+    });
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
   }
 
-  function unblockUser(userToUnblock) {
-    if (!isCreator) return;
-    const index = blockedUsers.indexOf(userToUnblock);
-    if (index === -1) {
-      alert(userToUnblock + " is not blocked.");
-      return;
-    }
-    blockedUsers.splice(index, 1);
-    localStorage.setItem("blockedUsers", JSON.stringify(blockedUsers));
-    unblockSound.play();
-    alert(userToUnblock + " has been unblocked.");
-
-    // If unblocking self (again, unlikely but safe)
-    if (userToUnblock === userName) {
-      blockedOverlay.style.display = "none";
-    }
-    updateUserList();
+  // Send a new message
+  function sendMessage() {
+    const text = input.value.trim();
+    if (!text) return;
+    messages.push({ user: userName, text });
+    localStorage.setItem("localChatMessages", JSON.stringify(messages));
+    renderMessages();
+    input.value = "";
   }
 
-  function unblockAll() {
-    if (!isCreator) return;
-    if (!blockedUsers.length) {
-      alert("No users to unblock.");
-      return;
-    }
-    blockedUsers = [];
-    localStorage.removeItem("blockedUsers");
-    unblockSound.play();
-    alert("All users unblocked.");
-    blockedOverlay.style.display = "none";
-    updateUserList();
+  // Block user (creator only)
+  function blockUser(name) {
+    if (!isCreator) return alert("Only Russell Shaun Edwards can block users.");
+    if (blockedUsers.includes(name)) return alert(name + " is already blocked.");
+    blockedUsers.push(name);
+    localStorage.setItem("localChatBlockedUsers", JSON.stringify(blockedUsers));
+    alert(name + " has been blocked.");
+    renderUsers();
+    renderMessages();
   }
 
-  function foundLove() {
-    matchDisplay.innerHTML = `💖 ${userName} has found true love in the Web of LOVE! 💖`;
-    addMessage(`🌟 ANNOUNCEMENT: ${userName} has found their match! 🎉`);
+  // Unblock user (creator only)
+  function unblockUser(name) {
+    if (!isCreator) return alert("Only Russell Shaun Edwards can unblock users.");
+    const idx = blockedUsers.indexOf(name);
+    if (idx === -1) return alert(name + " is not blocked.");
+    blockedUsers.splice(idx, 1);
+    localStorage.setItem("localChatBlockedUsers", JSON.stringify(blockedUsers));
+    alert(name + " has been unblocked.");
+    renderUsers();
+    renderMessages();
   }
 
-  // === Simulate users & initial UI update ===
-  setTimeout(() => {
-    users = {
-      "Luna 💫": true,
-      "Kai 🔥": true,
-      [userName]: true
-    };
-    updateUserList();
+  // Match found button
+  matchBtn.addEventListener("click", () => {
+    const message = `💖 ${userName} has found their match! 💖`;
+    matchDisplay.textContent = message;
+    messages.push({ user: "System", text: message });
+    localStorage.setItem("localChatMessages", JSON.stringify(messages));
+    renderMessages();
+  });
 
-    if (!blockedUsers.includes(userName)) {
-      addMessage(`🌟 Welcome to the Matchmaking Web of LOVE, ${userName}!`);
-    }
-  }, 500);
+  // Button event listener
+  sendBtn.addEventListener("click", sendMessage);
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") sendMessage();
+  });
+
+  // Initialize UI
+  renderUsers();
+  renderMessages();
+
+  // Expose block/unblock functions to global scope (for inline onclick)
+  window.blockUser = blockUser;
+  window.unblockUser = unblockUser;
+
 </script>
 
 </body>
